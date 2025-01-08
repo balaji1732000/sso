@@ -112,19 +112,27 @@
 <script>
 function onSignin(idToken) {
       let user = clientApplication.getAccount();
-      document.getElementById("userName").innerHTML = "Currently logged in as " + user.name;
-      let requestObj1 = {
-	scopes: ["user.read", 'openid', 'profile']
-      };
+      console.log("onSignin invoked with idToken:", idToken);
+      if (user) {
+        document.getElementById("userName").innerHTML = "Currently logged in as " + user.name;
+        console.log("Logged in user:", user);
+      } else {
+        console.error("No user account found after onSignin.");
+      }
     }
 
-    function onSignInClick() {
+function onSignInClick() {
+      console.log("Sign-in button clicked.");
       let requestObj = {
-	scopes: ["user.read", 'openid', 'profile']
+	  scopes: ["user.read", 'openid', 'profile']
       };
 
-      clientApplication.loginPopup(requestObj).then(onSignin).catch(function (error) {console.log(error) });
-    }
+      clientApplication.loginPopup(requestObj)
+        .then(onSignin)
+        .catch(function (error) {
+          console.error("Login failed:", error);
+        });
+}
 
 function getOAuthCardResourceUri(activity) {
   if (activity &&
@@ -132,31 +140,34 @@ function getOAuthCardResourceUri(activity) {
        activity.attachments[0] &&
        activity.attachments[0].contentType === 'application/vnd.microsoft.card.oauth' &&
        activity.attachments[0].content.tokenExchangeResource) {
-	 // asking for token exchange with AAD
+	 console.log("OAuth card resource URI found:", activity.attachments[0].content.tokenExchangeResource.uri);
 	 return activity.attachments[0].content.tokenExchangeResource.uri;
    }
 }
 
 function exchangeTokenAsync(resourceUri) {
   let user = clientApplication.getAccount();
-   if (user) {
-     let requestObj = {
-       scopes: [resourceUri]
-     };
-     return clientApplication.acquireTokenSilent(requestObj)
-       .then(function (tokenResponse) {
-	 return tokenResponse.accessToken;
-	 })
-	 .catch(function (error) {
-	   console.log(error);
-	 });
-	 }
-	 else {
-	 return Promise.resolve(null);
-   }
+  console.log("Attempting token exchange for resource URI:", resourceUri);
+  if (user) {
+    let requestObj = {
+      scopes: [resourceUri]
+    };
+    return clientApplication.acquireTokenSilent(requestObj)
+      .then(function (tokenResponse) {
+	  console.log("Token exchange successful. Token:", tokenResponse.accessToken);
+	  return tokenResponse.accessToken;
+	})
+	.catch(function (error) {
+	  console.error("Token exchange failed:", error);
+	});
+  } else {
+    console.warn("No user account found for token exchange.");
+    return Promise.resolve(null);
+  }
 }
 
 async function fetchJSON(url, options = {}) {
+    console.log("Fetching JSON from:", url, "with options:", options);
     const res = await fetch(url, {
       ...options,
       headers: {
@@ -166,122 +177,84 @@ async function fetchJSON(url, options = {}) {
     });
 
     if (!res.ok) {
+      console.error("Failed to fetch JSON. Status:", res.status, "StatusText:", res.statusText);
       throw new Error(`Failed to fetch JSON due to ${res.status}`);
     }
 
-    return await res.json();
-  } 
+    const json = await res.json();
+    console.log("Fetched JSON response:", json);
+    return json;
+} 
 </script>
 
 <script>
-     var clientApplication;
-     (function (){
-       var msalConfig = {
-	   auth: {
-	     clientId: '2dead18a-c91b-42e6-b6ab-10876a191cc4',
-	     authority: 'https://login.microsoftonline.com/f5791d91-daca-4d28-8700-680f7a2f8b6a'
-	   },
-	   cache: {
-	     cacheLocation: 'localStorage',
-	     storeAuthStateInCookie: false
-	   }
-       };
-       if (!clientApplication) {
-	 clientApplication = new Msal.UserAgentApplication(msalConfig);
-       }
-     } ());
+var clientApplication;
+(function (){
+  var msalConfig = {
+      auth: {
+        clientId: '2dead18a-c91b-42e6-b6ab-10876a191cc4',
+        authority: 'https://login.microsoftonline.com/f5791d91-daca-4d28-8700-680f7a2f8b6a'
+      },
+      cache: {
+        cacheLocation: 'localStorage',
+        storeAuthStateInCookie: false
+      }
+  };
+  if (!clientApplication) {
+    clientApplication = new Msal.UserAgentApplication(msalConfig);
+    console.log("MSAL client application initialized.");
+  }
+} ());
 
 (async function main() {
-  if (clientApplication.getAccount() == null) {
-           await clientApplication.loginPopup(requestObj).then(onSignin).catch(function (error) {console.log(error) });
-        }
+  try {
+    if (clientApplication.getAccount() == null) {
+      console.log("No cached account found. Triggering login.");
+      await clientApplication.loginPopup({ scopes: ["user.read", 'openid', 'profile'] }).then(onSignin);
+    } else {
+      console.log("Cached account found:", clientApplication.getAccount());
+    }
 
-    // Add your BOT ID below 
-    var theURL = "https://defaultf5791d91daca4d288700680f7a2f8b.6a.environment.api.powerplatform.com/powervirtualagents/botsbyschema/cr90a_websiteQACopilotVMbQUS/directline/token?api-version=2022-03-01-preview" // you can find the token URL via the mobile app channel configuration
+    const theURL = "https://defaultf5791d91daca4d288700680f7a2f8b.6a.environment.api.powerplatform.com/powervirtualagents/botsbyschema/cr90a_websiteQACopilotVMbQUS/directline/token?api-version=2022-03-01-preview";
+    console.log("Fetching Direct Line token from:", theURL);
+    const { token } = await fetchJSON(theURL);
+    console.log("Direct Line token fetched:", token);
 
-	var userId = clientApplication.account?.accountIdentifier != null ? 
-					("You-customized-prefix" + clientApplication.account.accountIdentifier).substr(0, 64) 
-					: (Math.random().toString() + Date.now().toString()).substr(0,64);
-					
-   const { token } = await fetchJSON(theURL);
-   console.log("------------------------------------------------------------",token,"---------------------------------------------")
-   const directLine = window.WebChat.createDirectLine({ token });
-   const store = WebChat.createStore({}, ({ dispatch }) => next => action => {
-      const { type } = action;
+    const directLine = window.WebChat.createDirectLine({ token });
+    const store = WebChat.createStore({}, ({ dispatch }) => next => action => {
+      console.log("Store action dispatched:", action);
       if (action.type === 'DIRECT_LINE/CONNECT_FULFILLED') {
-	dispatch({
-	  type: 'WEB_CHAT/SEND_EVENT',
-	  payload: {
-	    name: 'startConversation',
-	    type: 'event',
-	    value: { text: "hello" }
-	  }
-	});
-	return next(action);
+        console.log("Direct Line connected.");
+        dispatch({
+          type: 'WEB_CHAT/SEND_EVENT',
+          payload: {
+            name: 'startConversation',
+            type: 'event',
+            value: { text: "hello" }
+          }
+        });
       }
-      if (action.type === 'DIRECT_LINE/INCOMING_ACTIVITY') {
-	const activity = action.payload.activity;
-	let resourceUri;
-	if (activity.from && activity.from.role === 'bot' &&
-	  (resourceUri = getOAuthCardResourceUri(activity))) {
-	  exchangeTokenAsync(resourceUri).then(function (token) {
-	    if (token) {
-	      directLine.postActivity({
-		type: 'invoke',
-		name: 'signin/tokenExchange',
-		value: {
-		  id: activity.attachments[0].content.tokenExchangeResource.id,
-		  connectionName: activity.attachments[0].content.connectionName,
-		  token
-		},
-		"from": {
-		  id: userId,
-		  name: clientApplication.account.name,
-		  role: "user"
-		}
-	      }).subscribe(
-		id => {
-		  if (id === 'retry') {
-		    // bot was not able to handle the invoke, so display the oauthCard
-		    return next(action);
-		  }
-		  // else: tokenexchange successful and we do not display the oauthCard
-		},
-		error => {
-		  // an error occurred to display the oauthCard
-		  return next(action);
-		}
-	      );
-	      return;
-	    }
-	    else
-	      return next(action);
-	  });
-	}
-	else
-	  return next(action);
-      }
-      else
-	return next(action);
+      return next(action);
     });
 
-      const styleOptions = {
+    const styleOptions = {
+      hideUploadButton: true
+    };
 
-	 // Add styleOptions to customize Web Chat canvas
-	 hideUploadButton: true
-      };
-
-
-	      window.WebChat.renderWebChat(
-		  {
-		      directLine: directLine,
-			  store,
-			  userID:userId,
-		      styleOptions
-		  },
-		  document.getElementById('webchat')
-	      );
-})().catch(err => console.error("An error occurred: " + err));
-  </script>
+    window.WebChat.renderWebChat(
+      {
+        directLine: directLine,
+        store,
+        userID: clientApplication.account?.accountIdentifier || "anonymous",
+        styleOptions
+      },
+      document.getElementById('webchat')
+    );
+    console.log("WebChat rendered successfully.");
+  } catch (err) {
+    console.error("An error occurred in main():", err);
+  }
+})();
+</script>
 </body>
 </html>
