@@ -204,6 +204,7 @@ async function fetchJSON(url, options = {}) {
 					: (Math.random().toString() + Date.now().toString()).substr(0,64);
 					
    const { token } = await fetchJSON(theURL);
+   console.log("------------------------------------------------------------",token,"---------------------------------------------")
    const directLine = window.WebChat.createDirectLine({ token });
    const store = WebChat.createStore({}, ({ dispatch }) => next => action => {
       const { type } = action;
