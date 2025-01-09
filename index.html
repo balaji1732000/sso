@@ -10,6 +10,7 @@
 <script type="text/javascript">
   if (typeof Msal === 'undefined') document.write(unescape("%3Cscript src='https://alcdn.msftauth.net/lib/1.2.0/js/msal.js' type='text/javascript' %3E%3C/script%3E"));
 </script>
+
   <style>
       html, body {
 	  height: 100%;
@@ -103,7 +104,6 @@
   </div>
 </div>
   <div id="webchat">
-	  <iframe src="https://copilotstudio.microsoft.com/environments/Default-f5791d91-daca-4d28-8700-680f7a2f8b6a/bots/cr90a_websiteQACopilotVMbQUS/webchat?__version__=2" frameborder="0" style="width: 100%; height: 100%;">
   </div>
 
 </div>
@@ -189,8 +189,6 @@ async function fetchJSON(url, options = {}) {
 	 clientApplication = new Msal.UserAgentApplication(msalConfig);
        }
      } ());
-
-
 
 (async function main() {
 
