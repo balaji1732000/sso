@@ -131,7 +131,7 @@
         auth: {
           clientId: '2dead18a-c91b-42e6-b6ab-10876a191cc4', // Replace with your actual Client ID
           authority: 'https://login.microsoftonline.com/f5791d91-daca-4d28-8700-680f7a2f8b6a', // Replace with your actual Authority
-          redirectUri: "https://balaji1732000.github.io/sso/" // Optional: Define a redirect URI
+          redirectUri: "https://balaji1732000.github.io/sso/" // Replace with your actual redirect URI
         },
         cache: {
           cacheLocation: 'localStorage', // 'sessionStorage' can be used for better security
@@ -143,16 +143,45 @@
       }
     }) ();
 
+    // Function to acquire Direct Line token using Direct Line secret
+    async function getDirectLineToken() {
+      const directLineSecret = 'YOUR_DIRECT_LINE_SECRET'; // **WARNING:** Exposing this secret on client-side is insecure
+      try {
+        const response = await fetch('https://directline.botframework.com/v3/directline/tokens/generate', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${directLineSecret}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to generate Direct Line token: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return data.token;
+      } catch (error) {
+        console.error(error);
+        alert("Failed to obtain Direct Line token. Please check console for details.");
+        return null;
+      }
+    }
+
     // Update UI upon successful sign-in
-    function onSignin(idToken) {
+    async function onSignin(accessToken) {
       let user = clientApplication.getAccount();
       if (user) {
         document.getElementById("userName").innerHTML = "Currently logged in as " + user.name;
         document.getElementById("login").style.display = 'none'; // Hide login button after successful login
 
-        // Send the token to the iframe for SSO
-        const iframe = document.getElementById('webchatIframe');
-        iframe.contentWindow.postMessage({ type: 'auth', token: idToken }, 'https://copilotstudio.microsoft.com');
+        // Obtain Direct Line token
+        const directLineToken = await getDirectLineToken();
+        if (directLineToken) {
+          // Send the Direct Line token to the iframe via postMessage
+          const iframe = document.getElementById('webchatIframe');
+          iframe.contentWindow.postMessage({ type: 'directLineToken', token: directLineToken }, 'https://copilotstudio.microsoft.com');
+        }
       }
       // Additional logic after sign-in can be added here
     }
@@ -163,19 +192,37 @@
         scopes: ["user.read", 'openid', 'profile']
       };
       clientApplication.loginPopup(requestObj)
-        .then(onSignin)
+        .then(response => {
+          // Acquire an access token silently
+          return clientApplication.acquireTokenSilent(requestObj);
+        })
+        .then(accessTokenResponse => {
+          onSignin(accessTokenResponse.accessToken);
+        })
         .catch(function (error) {
           console.error("Login failed: ", error);
           alert("Login failed. Please try again.");
         });
     }
 
-    // Optional: Handle Sign-Out if needed
-    /*
-    function onSignOutClick() {
-      clientApplication.logout();
-    }
-    */
+    // Attempt to silently acquire token on page load
+    (function(){
+      clientApplication.handleRedirectCallback(function(error, response) {
+        if (error) {
+          console.error(error);
+        }
+      });
+
+      clientApplication.getAccount() && clientApplication.acquireTokenSilent({
+        scopes: ["user.read", 'openid', 'profile']
+      })
+      .then(accessTokenResponse => {
+        onSignin(accessTokenResponse.accessToken);
+      })
+      .catch(function (error) {
+        console.warn("Silent token acquisition failed. User needs to login.");
+      });
+    })();
 
     // Listen for messages from the iframe (if needed)
     window.addEventListener('message', function(event) {
